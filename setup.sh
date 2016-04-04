@@ -54,18 +54,3 @@ systemctl enable httpd
 systemctl enable redis
 systemctl start httpd
 systemctl start redis
-
-sudo -u apache tee /var/www/html/test_redis.php <<EOF
-<?php
-
-$redis = new Redis();
-
-$is_connected = $redis->connect('127.0.0.1', 6379);
-
-if (!$is_connected) {
-   echo "Redis: connection failed.\n";
-   exit(1);
-} else {
-   echo "Redis: connected!\n";
-}
-EOF
