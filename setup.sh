@@ -25,7 +25,12 @@ wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x
 sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 
 # enable httpd to talk to other services
+# need to add redis_port_t and sphinx_port_t
+#   mysqld_port_t: sudo setsebool -P httpd_can_network_connect_db 1
+# for now use httpd_can_network_connect
 sudo setsebool -P httpd_can_network_connect 1
+sudo setsebool -P httpd_execmem 1
+sudo setsebool -P httpd_can_sendmail 1
 sudo setsebool -P daemons_enable_cluster_mode 1
 
 # install php redis module
@@ -134,3 +139,28 @@ allow httpd_t tmp_t:sock_file write;
 checkmodule -M -m -o httpd-redis-sock.mod httpd-redis-sock.te
 semodule_package -m httpd-redis-sock.mod -o httpd-redis-sock.pp
 sudo semodule -i httpd-redis-sock.pp
+
+# install HTMLPurifer with support for PHP7
+sudo pear install channel://pear.php.net/XML_Serializer-0.20.2
+sudo pear install PEAR_PackageFileManager_Plugins
+sudo pear install PEAR_PackageFileManager2
+
+pear channel-discover htmlpurifier.org
+git clone https://github.com/ezyang/htmlpurifier.git
+cd htmlpurifier
+sed -i "s/setPhpDep('5.0.0')/setPhpDep('7.0.0')/g" package.php
+sed -i "s/setPearinstallerDep('1.4.3')/setPearinstallerDep('1.10.1')/g" package.php
+echo '4.8.0' > VERSION
+php package.php
+pear package library/package.xml
+sudo pear install HTMLPurifier-4.8.0.tgz
+cd ..
+rm -rf htmlpurifier
+
+sudo chmod 777 /usr/share/pear/HTMLPurifier/DefinitionCache/Serializer
+sudo chcon -R --reference=/usr/share/pear /usr/share/pear/HTMLPurifier
+
+sudo pear uninstall PEAR_PackageFileManager2
+sudo pear uninstall PEAR_PackageFileManager_Plugins
+sudo pear uninstall XML_Serializer
+sudo pear uninstall XML_Parser
