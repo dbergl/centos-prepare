@@ -60,12 +60,6 @@ cd ..
 rm -rf sphinx
 
 # enable and start services
-sudo mkdir -p /etc/systemd/system/httpd.service.d
-echo "
-[Service]
-PrivateTmp=false
-" | sudo tee /etc/systemd/system/httpd.service.d/nopt.conf
-sudo systemctl daemon-reload
 sudo systemctl enable httpd
 sudo systemctl start httpd
 
@@ -76,26 +70,8 @@ sudo systemctl restart sshd
 # redis.conf
 sudo sed -i 's/^bind/# bind/g' /etc/redis.conf
 sudo sed -i 's/^# unixsocket/unixsocket/g' /etc/redis.conf
-
-# set up redis policy to write /tmp/redis.sock
-echo "
-
-module redis-socket 1.0;
-
-require {
-        type tmp_t;
-        type redis_t;
-        class dir { write add_name remove_name };
-        class sock_file { create setattr unlink };
-}
-
-#============= redis_t ==============
-allow redis_t tmp_t:dir { write add_name remove_name };
-allow redis_t tmp_t:sock_file { create setattr unlink };
-" > redis-socket.te
-checkmodule -M -m -o redis-socket.mod redis-socket.te
-semodule_package -m redis-socket.mod -o redis-socket.pp
-sudo semodule -i redis-socket.pp
+sudo sed -i 's|/tmp/redis.sock|/var/run/redis/redis.sock|g' /etc/redis.conf
+sudo sed -i s'/unixsocketperm 700/unixsocketperm 777/g' /etc/redis.conf
 
 # enable and start redis
 sudo systemctl enable redis
@@ -124,17 +100,16 @@ sudo semodule -i httpd-sphinx.pp
 
 # enable httpd to talk to redis.sock
 echo "
-
 module httpd-redis-sock 1.0;
 
 require {
-   type httpd_t;
-   type tmp_t;
-   class sock_file write;
+	type httpd_t;
+	type redis_var_run_t;
+	class sock_file write;
 }
 
 #============= httpd_t ==============
-allow httpd_t tmp_t:sock_file write;
+allow httpd_t redis_var_run_t:sock_file write;
 " > httpd-redis-sock.te
 checkmodule -M -m -o httpd-redis-sock.mod httpd-redis-sock.te
 semodule_package -m httpd-redis-sock.mod -o httpd-redis-sock.pp
