@@ -17,8 +17,12 @@ sudo yum -y install vim-enhanced httpd redis30u mod_php70u php70u-cli \
    php70u-devel php70u-gd php70u-json php70u-mbstring php70u-mysqlnd \
    php70u-opcache php70u-pdo php70u-pear php70u-pecl-apcu php70u-process \
    php70u-soap php70u-xml git2u mariadb101u-devel mariadb101u-libs \
-   mariadb101u libsphinxclient libsphinxclient-devel gcc sphinx postfix \
+   mariadb101u libsphinxclient libsphinxclient-devel gcc unixODBC postfix \
    policycoreutils-python
+
+wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x86_64.rpm
+
+sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 
 # enable httpd to talk to other services
 setsebool httpd_can_network_connect on
@@ -51,6 +55,36 @@ rm -rf sphinx
 
 # enable and start services
 systemctl enable httpd
-systemctl enable redis
 systemctl start httpd
+
+# speed up ssh
+sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd_config
+systemctl restart sshd
+
+# redis.conf
+sed -i 's/^bind/# bind/g' /etc/redis.conf
+sed -i 's/^# unixsocket/unixsocket/g' /etc/redis.conf
+
+# set up redis policy to write /tmp/redis.sock
+echo "
+
+module redis-socket 1.0;
+
+require {
+        type tmp_t;
+        type redis_t;
+        class dir { write add_name remove_name };
+        class sock_file { create setattr unlink };
+}
+
+#============= redis_t ==============
+allow redis_t tmp_t:dir { write add_name remove_name };
+allow redis_t tmp_t:sock_file { create setattr unlink };
+" > redis-socket.te
+checkmodule -M -m -o redis-socket.mod redis-socket.te
+semodule_package -m redis-socket.mod -o redis-socket.pp
+semodule -i redis-socket.pp
+
+# enable and start redis
+systemctl enable redis
 systemctl start redis
