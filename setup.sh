@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # make sure curl and wget are available
-yum -y install curl wget
+sudo yum -y install curl wget
 
 # install epel and ius repos
-curl -L 'https://setup.ius.io/' | bash
+curl -L 'https://setup.ius.io/' | sudo bash
 
 # grab latest package updates
-yum -y update
+sudo yum -y update
 
 # remove mariadb 5.5 libs since they will conflict
-yum -y remove mariadb-libs
+sudo yum -y remove mariadb-libs
 
 # install apache, php, redis, mysql-client, etc...
 sudo yum -y install vim-enhanced httpd redis30u mod_php70u php70u-cli \
@@ -25,8 +25,8 @@ wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x
 sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 
 # enable httpd to talk to other services
-setsebool -P httpd_can_network_connect 1
-setsebool -P daemons_enable_cluster_mode 1
+sudo setsebool -P httpd_can_network_connect 1
+sudo setsebool -P daemons_enable_cluster_mode 1
 
 # install php redis module
 git clone https://github.com/phpredis/phpredis.git
@@ -35,8 +35,8 @@ git checkout php7
 phpize
 ./configure --with-php-config=`which php-config`
 make
-make install
-echo "extension=redis.so" | tee /etc/php.d/40-redis.ini
+sudo make install
+echo "extension=redis.so" | sudo tee /etc/php.d/40-redis.ini
 git clean -f -d
 cd ..
 rm -rf phpredis
@@ -48,29 +48,29 @@ git checkout php7
 phpize
 ./configure --with-php-config=`which php-config`
 make
-make install
-echo "extension=sphinx.so" | tee /etc/php.d/40-sphinx.ini
+sudo make install
+echo "extension=sphinx.so" | sudo tee /etc/php.d/40-sphinx.ini
 git clean -f -d
 cd ..
 rm -rf sphinx
 
 # enable and start services
-mkdir -p /etc/systemd/system/httpd.service.d
+sudo mkdir -p /etc/systemd/system/httpd.service.d
 echo "
 [Service]
 PrivateTmp=false
-" > /etc/systemd/system/httpd.service.d/nopt.conf
-systemctl daemon-reload
-systemctl enable httpd
-systemctl start httpd
+" | sudo tee /etc/systemd/system/httpd.service.d/nopt.conf
+sudo systemctl daemon-reload
+sudo systemctl enable httpd
+sudo systemctl start httpd
 
 # speed up ssh
-sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd_config
-systemctl restart sshd
+sudo sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd_config
+sudo systemctl restart sshd
 
 # redis.conf
-sed -i 's/^bind/# bind/g' /etc/redis.conf
-sed -i 's/^# unixsocket/unixsocket/g' /etc/redis.conf
+sudo sed -i 's/^bind/# bind/g' /etc/redis.conf
+sudo sed -i 's/^# unixsocket/unixsocket/g' /etc/redis.conf
 
 # set up redis policy to write /tmp/redis.sock
 echo "
@@ -90,11 +90,11 @@ allow redis_t tmp_t:sock_file { create setattr unlink };
 " > redis-socket.te
 checkmodule -M -m -o redis-socket.mod redis-socket.te
 semodule_package -m redis-socket.mod -o redis-socket.pp
-semodule -i redis-socket.pp
+sudo semodule -i redis-socket.pp
 
 # enable and start redis
-systemctl enable redis
-systemctl start redis
+sudo systemctl enable redis
+sudo systemctl start redis
 
 # enable httpd to talk to sphinx.sock
 echo "
@@ -115,7 +115,7 @@ allow httpd_t initrc_t:unix_stream_socket connectto;
 " > httpd-sphinx.te
 checkmodule -M -m -o httpd-sphinx.mod httpd-sphinx.te
 semodule_package -m httpd-sphinx.mod -o httpd-sphinx.pp
-semodule -i httpd-sphinx.pp
+sudo semodule -i httpd-sphinx.pp
 
 # enable httpd to talk to redis.sock
 echo "
@@ -133,4 +133,4 @@ allow httpd_t tmp_t:sock_file write;
 " > httpd-redis-sock.te
 checkmodule -M -m -o httpd-redis-sock.mod httpd-redis-sock.te
 semodule_package -m httpd-redis-sock.mod -o httpd-redis-sock.pp
-semodule -i httpd-redis-sock.pp
+sudo semodule -i httpd-redis-sock.pp
