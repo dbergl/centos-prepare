@@ -25,7 +25,8 @@ wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x
 sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 
 # enable httpd to talk to other services
-setsebool httpd_can_network_connect on
+setsebool -P httpd_can_network_connect 1
+setsebool -P daemons_enable_cluster_mode 1
 
 # install php redis module
 git clone https://github.com/phpredis/phpredis.git
@@ -54,6 +55,12 @@ cd ..
 rm -rf sphinx
 
 # enable and start services
+mkdir -p /etc/systemd/system/httpd.service.d
+echo "
+[Service]
+PrivateTmp=false
+" > /etc/systemd/system/httpd.service.d/nopt.conf
+systemctl daemon-reload
 systemctl enable httpd
 systemctl start httpd
 
@@ -88,3 +95,42 @@ semodule -i redis-socket.pp
 # enable and start redis
 systemctl enable redis
 systemctl start redis
+
+# enable httpd to talk to sphinx.sock
+echo "
+
+module httpd-sphinx 1.0;
+
+require {
+   type var_run_t;
+   type httpd_t;
+   type initrc_t;
+   class sock_file write;
+   class unix_stream_socket connectto;
+}
+
+#============= httpd_t ==============
+allow httpd_t var_run_t:sock_file write;
+allow httpd_t initrc_t:unix_stream_socket connectto;
+" > httpd-sphinx.te
+checkmodule -M -m -o httpd-sphinx.mod httpd-sphinx.te
+semodule_package -m httpd-sphinx.mod -o httpd-sphinx.pp
+semodule -i httpd-sphinx.pp
+
+# enable httpd to talk to redis.sock
+echo "
+
+module httpd-redis-sock 1.0;
+
+require {
+   type httpd_t;
+   type tmp_t;
+   class sock_file write;
+}
+
+#============= httpd_t ==============
+allow httpd_t tmp_t:sock_file write;
+" > httpd-redis-sock.te
+checkmodule -M -m -o httpd-redis-sock.mod httpd-redis-sock.te
+semodule_package -m httpd-redis-sock.mod -o httpd-redis-sock.pp
+semodule -i httpd-redis-sock.pp
