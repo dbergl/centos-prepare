@@ -24,11 +24,7 @@ wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x
 
 sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 
-# enable httpd to talk to other services
-# need to add redis_port_t and sphinx_port_t
-#   mysqld_port_t: sudo setsebool -P httpd_can_network_connect_db 1
-# for now use httpd_can_network_connect
-sudo setsebool -P httpd_can_network_connect 1
+sudo setsebool -P httpd_can_network_connect_db 1
 sudo setsebool -P httpd_execmem 1
 sudo setsebool -P httpd_can_sendmail 1
 sudo setsebool -P daemons_enable_cluster_mode 1
@@ -77,43 +73,55 @@ sudo sed -i s'/unixsocketperm 700/unixsocketperm 777/g' /etc/redis.conf
 sudo systemctl enable redis
 sudo systemctl start redis
 
-# enable httpd to talk to sphinx.sock
+# enable httpd to talk to sphinx
 echo "
 
 module httpd-sphinx 1.0;
 
 require {
-   type var_run_t;
-   type httpd_t;
-   type initrc_t;
-   class sock_file write;
-   class unix_stream_socket connectto;
+    attribute port_type;
+    attribute defined_port_type;
+    attribute unreserved_port_type;
+    type httpd_t;
+    type var_run_t;
+    type initrc_t;
+    class sock_file write;
+    class unix_stream_socket connectto;
+    class tcp_socket name_connect;
 }
 
-#============= httpd_t ==============
+type sphinx_port_t, port_type, defined_port_type;
+typeattribute sphinx_port_t unreserved_port_type;
+
+#============== httpd_t ==============
 allow httpd_t var_run_t:sock_file write;
 allow httpd_t initrc_t:unix_stream_socket connectto;
+allow httpd_t sphinx_port_t:tcp_socket name_connect;
 " > httpd-sphinx.te
 checkmodule -M -m -o httpd-sphinx.mod httpd-sphinx.te
 semodule_package -m httpd-sphinx.mod -o httpd-sphinx.pp
 sudo semodule -i httpd-sphinx.pp
+sudo semanage port -a -t sphinx_port_t -p tcp 3312
 
-# enable httpd to talk to redis.sock
+# enable httpd to talk to redis
 echo "
-module httpd-redis-sock 1.0;
+module httpd-redis 1.0;
 
 require {
+    type redis_port_t;
 	type httpd_t;
 	type redis_var_run_t;
 	class sock_file write;
+    class tcp_socket name_connect;
 }
 
 #============= httpd_t ==============
 allow httpd_t redis_var_run_t:sock_file write;
-" > httpd-redis-sock.te
-checkmodule -M -m -o httpd-redis-sock.mod httpd-redis-sock.te
-semodule_package -m httpd-redis-sock.mod -o httpd-redis-sock.pp
-sudo semodule -i httpd-redis-sock.pp
+allow httpd_t redis_port_t:tcp_socket name_connect;
+" > httpd-redis.te
+checkmodule -M -m -o httpd-redis.mod httpd-redis.te
+semodule_package -m httpd-redis.mod -o httpd-redis.pp
+sudo semodule -i httpd-redis.pp
 
 # install HTMLPurifer with support for PHP7
 sudo pear install channel://pear.php.net/XML_Serializer-0.20.2
