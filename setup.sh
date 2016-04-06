@@ -128,7 +128,7 @@ sudo pear install channel://pear.php.net/XML_Serializer-0.20.2
 sudo pear install PEAR_PackageFileManager_Plugins
 sudo pear install PEAR_PackageFileManager2
 
-pear channel-discover htmlpurifier.org
+sudo pear channel-discover htmlpurifier.org
 git clone https://github.com/ezyang/htmlpurifier.git
 cd htmlpurifier
 sed -i "s/setPhpDep('5.0.0')/setPhpDep('7.0.0')/g" package.php
