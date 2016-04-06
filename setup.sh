@@ -19,7 +19,7 @@ sudo yum -y install vim-enhanced httpd redis30u mod_php70u php70u-cli \
    php70u-soap php70u-xml git2u mariadb101u-devel mariadb101u-libs \
    mariadb101u libsphinxclient libsphinxclient-devel gcc unixODBC postfix \
    policycoreutils-python screen sysstat bind-utils ntp cronolog \
-   nmap-ncat mailx pv bc
+   nmap-ncat mailx pv bc libtool httpd-devel
 
 wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x86_64.rpm
 
@@ -28,6 +28,7 @@ sudo yum -y install sphinx-2.2.10-1.rhel7.x86_64.rpm
 sudo setsebool -P httpd_can_network_connect_db 1
 sudo setsebool -P httpd_execmem 1
 sudo setsebool -P httpd_can_sendmail 1
+sudo setsebool -P httpd_unified 1
 sudo setsebool -P daemons_enable_cluster_mode 1
 
 # install php redis module
@@ -166,3 +167,13 @@ allow httpd_t hugetlbfs_t:file write;
 checkmodule -M -m -o httpd-php-opcache.mod httpd-php-opcache.te
 semodule_package -m httpd-php-opcache.mod -o httpd-php-opcache.pp
 sudo semodule -i httpd-php-opcache.pp
+
+# set up mod_cloudflare and disable mod_remoteip
+sudo sed -i 's|LoadModule remoteip_module|#LoadModule remoteip_module|g' \
+   /etc/httpd/conf.modules.d/00-base.conf
+git clone https://github.com/cloudflare/mod_cloudflare.git
+sudo apxs -a -i -c mod_cloudflare/mod_cloudflare.c
+sudo sed -i '/LoadModule cloudflare_module/d' /etc/httpd/conf/httpd.conf
+echo 'LoadModule cloudflare_module modules/mod_cloudflare.so' \
+   | sudo tee -a /etc/httpd/conf.modules.d/00-base.conf
+sudo rm -rf mod_cloudflare
