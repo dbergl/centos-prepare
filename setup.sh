@@ -19,7 +19,7 @@ sudo yum -y install vim-enhanced httpd redis30u mod_php70u php70u-cli \
    php70u-soap php70u-xml git2u mariadb101u-devel mariadb101u-libs \
    mariadb101u libsphinxclient libsphinxclient-devel gcc unixODBC postfix \
    policycoreutils-python screen sysstat bind-utils ntp cronolog \
-   nmap-ncat mailx pv bc libtool httpd-devel
+   nmap-ncat mailx pv bc libtool httpd-devel mod_ssl s3cmd unzip
 
 wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x86_64.rpm
 
