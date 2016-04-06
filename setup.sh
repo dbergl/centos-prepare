@@ -18,7 +18,8 @@ sudo yum -y install vim-enhanced httpd redis30u mod_php70u php70u-cli \
    php70u-opcache php70u-pdo php70u-pear php70u-pecl-apcu php70u-process \
    php70u-soap php70u-xml git2u mariadb101u-devel mariadb101u-libs \
    mariadb101u libsphinxclient libsphinxclient-devel gcc unixODBC postfix \
-   policycoreutils-python
+   policycoreutils-python screen sysstat bind-utils ntp cronolog \
+   nmap-ncat mailx pv bc
 
 wget --content-disposition http://sphinxsearch.com/files/sphinx-2.2.10-1.rhel7.x86_64.rpm
 
@@ -147,3 +148,21 @@ sudo pear uninstall PEAR_PackageFileManager2
 sudo pear uninstall PEAR_PackageFileManager_Plugins
 sudo pear uninstall XML_Serializer
 sudo pear uninstall XML_Parser
+
+# php opcache uses huge pages
+echo "
+
+module httpd-php-opcache 1.0;
+
+require {
+   type httpd_t;
+   type hugetlbfs_t;
+   class file write;
+}
+
+#============= httpd_t ==============
+allow httpd_t hugetlbfs_t:file write;
+" > httpd-php-opcache.te
+checkmodule -M -m -o httpd-php-opcache.mod httpd-php-opcache.te
+semodule_package -m httpd-php-opcache.mod -o httpd-php-opcache.pp
+sudo semodule -i httpd-php-opcache.pp
